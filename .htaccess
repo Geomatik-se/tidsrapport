@@ -1,0 +1,50 @@
+# Aktiviere die Rewrite-Engine
+RewriteEngine On
+
+# Setze den Basis-Pfad
+RewriteBase /
+
+# Verhindere Zugriff auf Verzeichnisse
+Options -Indexes
+
+# Verhindere direkten Zugriff auf PHP-Dateien im includes-Verzeichnis
+RewriteRule ^includes/.*\.php$ - [F,L]
+
+# Verhindere direkten Zugriff auf PHP-Dateien im config-Verzeichnis
+RewriteRule ^config/.*\.php$ - [F,L]
+
+# Verhindere direkten Zugriff auf SQL-Dateien
+RewriteRule ^sql/.*\.sql$ - [F,L]
+
+# PHP-Einstellungen
+php_flag display_errors off
+php_value error_reporting 0
+php_value max_execution_time 300
+php_value max_input_time 300
+php_value upload_max_filesize 10M
+php_value post_max_size 10M
+php_value memory_limit 128M
+
+# Setze den Zeichensatz
+AddDefaultCharset UTF-8
+
+# Aktiviere GZIP-Kompression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/x-javascript
+</IfModule>
+
+# Setze Caching-Header
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType text/javascript "access plus 1 month"
+    ExpiresByType text/html "access plus 1 day"
+</IfModule>
+
+# Weiterleitung zur Login-Seite, wenn keine Datei angegeben ist
+DirectoryIndex login.php 
