@@ -11,11 +11,16 @@ requireLogin();
 
 // Mitarbeiter löschen
 if (isset($_POST['delete']) && isset($_POST['id'])) {
-    $id = (int)$_POST['id'];
-    if (deleteEmployee($id)) {
-        $successMessage = 'Medarbetaren har tagits bort.';
+    // Nur Admin darf Mitarbeiter löschen
+    if (!isAdmin()) {
+        $errorMessage = 'Endast administratorer kan ta bort medarbetare.';
     } else {
-        $errorMessage = 'Det gick inte att ta bort medarbetaren.';
+        $id = (int)$_POST['id'];
+        if (deleteEmployee($id)) {
+            $successMessage = 'Medarbetaren har tagits bort.';
+        } else {
+            $errorMessage = 'Det gick inte att ta bort medarbetaren.';
+        }
     }
 }
 
@@ -81,10 +86,12 @@ $employees = getAllEmployees();
                             <td class="actions">
                                 <a href="employee_edit.php?id=<?php echo $employee['id']; ?>" class="btn">Redigera</a>
                                 
+                                <?php if (isAdmin()): ?>
                                 <form method="post" action="" class="delete-form" onsubmit="return confirm('Är du säker på att du vill ta bort denna medarbetare?');">
                                     <input type="hidden" name="id" value="<?php echo $employee['id']; ?>">
                                     <button type="submit" name="delete" class="btn btn-danger">Ta bort</button>
                                 </form>
+                                <?php endif; ?>
                                 
                                 <a href="employee_month.php?id=<?php echo $employee['id']; ?>" class="btn">Visa tidsrapport</a>
                             </td>

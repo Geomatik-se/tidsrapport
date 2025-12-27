@@ -1,6 +1,6 @@
 <?php
 /**
- * Import von Arbeitszeiten aus CSV-Dateien
+ * Import von Arbeitszeiten aus CSV-Dateien (KORRIGIERTE VERSION)
  */
 
 require_once 'includes/auth.php';
@@ -42,21 +42,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['import_file'])) {
                 $firstLine = fgets($handle);
                 rewind($handle);
                 $delimiter = (strpos($firstLine, ';') !== false) ? ';' : ',';
-                
                 fgetcsv($handle, 1000, $delimiter); // Skip header
                 $line = 1;
-                
                 while (($data = fgetcsv($handle, 1000, $delimiter)) !== false) {
                     $line++;
                     if (empty(array_filter($data))) continue;
-                    // Nur die ersten 5 Spalten verwenden (Datum + Arbete)
-                    $data = array_slice($data, 0, 5);
                     try {
-                        // Debug: Zeige erste 3 Zeilen
                         if ($line <= 4) {
                             $details[] = "Zeile $line: " . implode(' | ', array_map('trim', $data));
                         }
-                        // Parse Datum (z.B. "1 Mån" oder "2025-12-01")
                         $dateStr = trim($data[0]);
                         if (preg_match('/^(\d+)/', $dateStr, $m)) {
                             $day = (int)$m[1];
@@ -66,30 +60,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['import_file'])) {
                             $details[] = "Zeile $line: Ungültiges Datum '$dateStr'";
                             continue;
                         }
-                        // Nur Arbete importieren, alle anderen Werte ignorieren (nicht überschreiben)
-                            $arbeitWert = isset($data[4]) && trim($data[4]) !== '' ? floatval(str_replace(',', '.', trim($data[4]))) : 0;
-                            $avtalad_procent = 60;
-
-                            if ($employeeId > 0) {
-                                $pdo = getDBConnection();
-                                $year = $importYear;
-                                $month = $importMonth;
-
-                                $stmt = $pdo->prepare("SELECT * FROM work_hours WHERE employee_id = ? AND date = ?");
-                                $stmt->execute([$employeeId, $date]);
-                                $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                                if ($existing) {
-                                    // Nur Arbeit überschreiben, Rest bleibt wie im Datensatz
-                                    $stmt = $pdo->prepare("UPDATE work_hours SET arbete=? WHERE id=?");
-                                    $stmt->execute([$arbeitWert, $existing['id']]);
-                                } else {
-                                    // Neue Zeile: Nur Arbeit und Pflichtfelder setzen, Rest auf NULL/default
-                                    $stmt = $pdo->prepare("INSERT INTO work_hours (employee_id, date, avtalad_procent, arbete, year, month) VALUES (?, ?, ?, ?, ?, ?)");
-                                    $stmt->execute([$employeeId, $date, $avtalad_procent, $arbeitWert, $year, $month]);
-                                }
-                                $imported++;
+                        $arbetstid = isset($data[1]) && trim($data[1]) !== '' ? floatval(str_replace(',', '.', trim($data[1]))) : 0;
+                        $sjuk = isset($data[2]) && trim($data[2]) !== '' ? floatval(str_replace(',', '.', trim($data[2]))) : 0;
+                        $semester = isset($data[3]) && trim($data[3]) !== '' ? floatval(str_replace(',', '.', trim($data[3]))) : 0;
+                        $arbete = isset($data[4]) && trim($data[4]) !== '' ? floatval(str_replace(',', '.', trim($data[4]))) : 0;
+                        $distansarbete = isset($data[5]) && trim($data[5]) !== '' ? floatval(str_replace(',', '.', trim($data[5]))) : 0;
+                        $avtalad_procent = 60;
+                        if ($employeeId > 0) {
+                            $pdo = getDBConnection();
+                            $year = $importYear;
+                            $month = $importMonth;
+                            $stmt = $pdo->prepare("SELECT id FROM work_hours WHERE employee_id = ? AND date = ?");
+                            $stmt->execute([$employeeId, $date]);
+                            $existing = $stmt->fetch();
+                            if ($existing) {
+                                $stmt = $pdo->prepare("UPDATE work_hours SET arbetstid=?, sjuk=?, semester=?, avtalad_procent=?, arbete=?, distansarbete=?, year=?, month=? WHERE id=?");
+                                $stmt->execute([$arbetstid, $sjuk, $semester, $avtalad_procent, $arbete, $distansarbete, $year, $month, $existing['id']]);
+                            } else {
+                                $stmt = $pdo->prepare("INSERT INTO work_hours (employee_id, date, arbetstid, sjuk, semester, avtalad_procent, arbete, distansarbete, year, month) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                                $stmt->execute([$employeeId, $date, $arbetstid, $sjuk, $semester, $avtalad_procent, $arbete, $distansarbete, $year, $month]);
                             }
+                            $imported++;
+                        }
                     } catch (Exception $e) {
                         $errors++;
                         $details[] = "Zeile $line Fehler: " . $e->getMessage();
@@ -136,63 +128,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['import_file'])) {
                     <li><a href="index.php">Hem</a></li>
                     <li><a href="employees.php">Medarbetare</a></li>
                     <li><a href="holidays.php">Röda dagar</a></li>
-                    <li><a href="import.php" class="active">Importera</a></li>
+                    <li><a href="import_KORRIGIERT.php" class="active">Importera</a></li>
                     <li><a href="logout.php">Logga ut</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-
     <div class="container">
         <div class="import-box">
-            <h1>Importera arbetstider</h1>
-            
+            <h1>Importera arbetstider (Korrigiert)</h1>
             <?php if ($message): ?>
-                <div class="msg-success"><?php echo htmlspecialchars($message); ?></div>
+                <div class="msg-success"><?php echo $message; ?></div>
             <?php endif; ?>
-            
             <?php if ($error): ?>
-                <div class="msg-error"><?php echo htmlspecialchars($error); ?></div>
+                <div class="msg-error"><?php echo $error; ?></div>
             <?php endif; ?>
-            
             <form method="post" enctype="multipart/form-data">
                 <div class="form-group">
-                    <label>Mitarbeiter:</label>
-                    <select name="employee_id" required>
-                        <option value="">-- Välj medarbetare --</option>
-                        <?php
-                        $employees = getAllEmployees();
-                        foreach ($employees as $emp) {
-                            $sel = ($emp['id'] == $employeeId) ? 'selected' : '';
-                            echo "<option value='{$emp['id']}' $sel>{$emp['name']}</option>";
-                        }
-                        ?>
+                    <label for="employee_id">Mitarbeiter:</label>
+                    <select name="employee_id" id="employee_id" required>
+                        <?php foreach (getAllEmployees() as $emp): ?>
+                            <option value="<?php echo $emp['id']; ?>" <?php if ($emp['id'] == $employeeId) echo 'selected'; ?>><?php echo htmlspecialchars($emp['name']); ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
-                
                 <div class="form-group">
-                    <label>Jahr:</label>
-                    <input type="number" name="import_year" value="<?php echo $importYear; ?>" min="2020" max="2030" required>
+                    <label for="import_year">Jahr:</label>
+                    <input type="number" name="import_year" id="import_year" value="<?php echo $importYear; ?>" required>
                 </div>
-                
                 <div class="form-group">
-                    <label>Monat:</label>
-                    <select name="import_month" required>
+                    <label for="import_month">Monat:</label>
+                    <select name="import_month" id="import_month" required>
                         <?php for ($m = 1; $m <= 12; $m++): ?>
-                            <option value="<?php echo $m; ?>" <?php echo ($m == $importMonth) ? 'selected' : ''; ?>><?php echo $m; ?></option>
+                            <option value="<?php echo $m; ?>" <?php if ($m == $importMonth) echo 'selected'; ?>><?php echo $m; ?></option>
                         <?php endfor; ?>
                     </select>
                 </div>
-                
-                <div class="upload-box">
-                    <input type="file" name="import_file" accept=".csv" required>
-                    <p>CSV-Datei auswählen (Format: Datum, Arbeitszeit, Krank, Urlaub)</p>
+                <div class="form-group upload-box">
+                    <input type="file" name="import_file" id="import_file" accept=".csv" required>
+                    <p>CSV-Datei auswählen (Format: Datum, Arbeitszeit, Krank, Urlaub, Arbete, Distansarbete)</p>
                 </div>
-                
                 <button type="submit" class="btn">Importera</button>
                 <a href="index.php" class="btn" style="background: #95a5a6; margin-left: 10px;">Avbryt</a>
             </form>
-            
             <div style="margin-top: 30px; padding: 15px; background: #e3f2fd; border-radius: 4px;">
                 <h3>Format-Info</h3>
                 <p>CSV-Datei sollte folgende Spalten haben:</p>

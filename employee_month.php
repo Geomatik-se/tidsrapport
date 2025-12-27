@@ -93,8 +93,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Monatssummen berechnen
 $monthBalance = getEmployeeMonthBalance($id, $month, $year);
+
+// Korrekte Summenberechnung für Saldo (Tagessaldi aufsummieren)
+$sumSaldo = 0;
+foreach ($workHours as $workHour) {
+    $hundredPercent = $workHour['arbetstid'] - $workHour['sjuk'] - $workHour['semester'];
+    $avtaladTid = $hundredPercent * ($workHour['avtalad_procent'] / 100);
+    $sumSaldo += $workHour['arbete'] - $avtaladTid;
+}
 
 // Seitentitel
 $pageTitle = htmlspecialchars($employee['name']) . ' - ' . getMonthName($month) . ' ' . $year;
@@ -114,18 +121,18 @@ $pageTitle = htmlspecialchars($employee['name']) . ' - ' . getMonthName($month) 
             const semester = parseFloat(row.querySelector('.semester').value) || 0;
             const avtaladProcent = parseFloat(row.querySelector('.avtalad-procent').value) || 0;
             const arbete = parseFloat(row.querySelector('.arbete').value) || 0;
-            const distansarbete = parseFloat(row.querySelector('.distansarbete').value) || 0;
-            
+            // distansarbete entfernt
+
             // 100% berechnen
             const hundredPercent = arbetstid - sjuk - semester;
             row.querySelector('.hundred-percent').textContent = hundredPercent.toFixed(1);
-            
+
             // Avtalad tid berechnen
             const avtaladTid = hundredPercent * (avtaladProcent / 100);
             row.querySelector('.avtalad-tid').textContent = avtaladTid.toFixed(1);
-            
-            // Saldo berechnen
-            const saldo = arbete + distansarbete - avtaladTid;
+
+            // Saldo berechnen (nur noch Arbeit)
+            const saldo = arbete - avtaladTid;
             row.querySelector('.saldo').textContent = saldo.toFixed(1);
         }
         
@@ -200,7 +207,6 @@ $pageTitle = htmlspecialchars($employee['name']) . ' - ' . getMonthName($month) 
                         <th>Avtalad %</th>
                         <th class="grey-bg">Avtalad tid</th>
                         <th>Arbete</th>
-                        <th>Distansarbete</th>
                         <th class="grey-bg">Saldo</th>
                     </tr>
                 </thead>
@@ -272,20 +278,15 @@ $pageTitle = htmlspecialchars($employee['name']) . ' - ' . getMonthName($month) 
                                 ?>
                             </td>
                             <td>
-                                <input type="number" name="work_hours[<?php echo $dateStr; ?>][arbete]" 
-                                       value="<?php echo $workHour['arbete']; ?>" 
-                                       step="0.1" min="0" class="arbete calc-trigger">
-                            </td>
-                            <td>
-                                <input type="number" name="work_hours[<?php echo $dateStr; ?>][distansarbete]" 
-                                       value="<?php echo $workHour['distansarbete']; ?>" 
-                                       step="0.1" min="0" class="distansarbete calc-trigger">
-                            </td>
+                                    <input type="number" name="work_hours[<?php echo $dateStr; ?>][arbete]" 
+                                        value="<?php echo $workHour['arbete']; ?>" 
+                                        step="0.1" min="0" class="arbete calc-trigger">
+                                </td>
                             <td class="grey-bg saldo">
                                 <?php 
                                 $hundredPercent = $workHour['arbetstid'] - $workHour['sjuk'] - $workHour['semester'];
                                 $avtaladTid = $hundredPercent * ($workHour['avtalad_procent'] / 100);
-                                echo number_format($workHour['arbete'] + $workHour['distansarbete'] - $avtaladTid, 1, ',', ' ');
+                                echo number_format($workHour['arbete'] - $avtaladTid, 1, ',', ' ');
                                 ?>
                             </td>
                         </tr>
@@ -302,8 +303,7 @@ $pageTitle = htmlspecialchars($employee['name']) . ' - ' . getMonthName($month) 
                         <td>-</td>
                         <td class="grey-bg"><?php echo number_format($monthBalance['total_avtalad'], 1, ',', ' '); ?></td>
                         <td><?php echo number_format($monthBalance['total_arbete'], 1, ',', ' '); ?></td>
-                        <td><?php echo number_format($monthBalance['total_distansarbete'], 1, ',', ' '); ?></td>
-                        <td class="grey-bg"><?php echo number_format($monthBalance['total_saldo'], 1, ',', ' '); ?></td>
+                        <td class="grey-bg"><?php echo number_format($sumSaldo, 1, ',', ' '); ?></td>
                     </tr>
                 </tbody>
             </table>

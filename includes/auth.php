@@ -20,6 +20,15 @@ function isLoggedIn() {
 }
 
 /**
+ * Überprüft, ob der angemeldete Benutzer ein Admin ist
+ * 
+ * @return bool True, wenn der Benutzer Admin ist, sonst False
+ */
+function isAdmin() {
+    return isset($_SESSION['is_admin']) && $_SESSION['is_admin'] == 1;
+}
+
+/**
  * Leitet zur Anmeldeseite weiter, wenn der Benutzer nicht angemeldet ist
  */
 function requireLogin() {
@@ -39,7 +48,7 @@ function requireLogin() {
 function login($username, $password) {
     $pdo = getDBConnection();
     
-    $stmt = $pdo->prepare("SELECT id, password FROM users WHERE username = ?");
+    $stmt = $pdo->prepare("SELECT id, password, is_admin FROM users WHERE username = ?");
     $stmt->execute([$username]);
     
     if ($stmt->rowCount() > 0) {
@@ -49,6 +58,7 @@ function login($username, $password) {
             // Anmeldung erfolgreich
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $username;
+            $_SESSION['is_admin'] = $user['is_admin'] ?? 0;
             return true;
         }
     }

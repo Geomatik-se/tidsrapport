@@ -193,8 +193,8 @@ function getEmployeeMonthBalance($employeeId, $month, $year) {
             SUM(arbetstid - sjuk - semester) AS total_100,
             SUM((arbetstid - sjuk - semester) * (avtalad_procent / 100)) AS total_avtalad,
             SUM(arbete) AS total_arbete,
-            SUM(distansarbete) AS total_distansarbete,
-            SUM(arbete + distansarbete - ((arbetstid - sjuk - semester) * (avtalad_procent / 100))) AS total_saldo
+            0 AS total_distansarbete,
+            SUM(arbete - ((arbetstid - sjuk - semester) * (avtalad_procent / 100))) AS total_saldo
         FROM work_hours
         WHERE employee_id = ? AND date BETWEEN ? AND ?
     ");

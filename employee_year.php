@@ -37,10 +37,21 @@ $yearTotals = [
     'total_saldo' => 0
 ];
 
+
+require_once 'includes/work_hours.php';
+
 for ($month = 1; $month <= 12; $month++) {
     $monthData = getEmployeeMonthBalance($id, $month, $year);
+    // Korrekte Monats-Saldi berechnen (Summe der Tagessaldi wie in Monatsansicht)
+    $workHours = getWorkHoursForMonth($id, $month, $year);
+    $sumSaldo = 0;
+    foreach ($workHours as $workHour) {
+        $hundredPercent = $workHour['arbetstid'] - $workHour['sjuk'] - $workHour['semester'];
+        $avtaladTid = $hundredPercent * ($workHour['avtalad_procent'] / 100);
+        $sumSaldo += $workHour['arbete'] - $avtaladTid;
+    }
+    $monthData['total_saldo'] = $sumSaldo;
     $monthsData[$month] = $monthData;
-    
     // Jahressummen aktualisieren
     foreach ($yearTotals as $key => $value) {
         $yearTotals[$key] += $monthData[$key];
@@ -96,7 +107,7 @@ $pageTitle = htmlspecialchars($employee['name']) . ' - Årsöversikt ' . $year;
                     <th>100%</th>
                     <th>Avtalad tid</th>
                     <th class="grey-bg">Arbete</th>
-                    <th>Distansarbete</th>
+                    
                     <th class="grey-bg">Saldo</th>
                     <th>Åtgärder</th>
                 </tr>
@@ -111,7 +122,7 @@ $pageTitle = htmlspecialchars($employee['name']) . ' - Årsöversikt ' . $year;
                         <td><?php echo number_format($monthsData[$month]['total_100'], 1, ',', ' '); ?></td>
                         <td><?php echo number_format($monthsData[$month]['total_avtalad'], 1, ',', ' '); ?></td>
                         <td class="grey-bg"><?php echo number_format($monthsData[$month]['total_arbete'], 1, ',', ' '); ?></td>
-                        <td><?php echo number_format($monthsData[$month]['total_distansarbete'], 1, ',', ' '); ?></td>
+                        
                         <td class="grey-bg"><?php echo number_format($monthsData[$month]['total_saldo'], 1, ',', ' '); ?></td>
                         <td>
                             <a href="employee_month.php?id=<?php echo $id; ?>&year=<?php echo $year; ?>&month=<?php echo $month; ?>" class="btn">Visa detaljer</a>
@@ -126,7 +137,7 @@ $pageTitle = htmlspecialchars($employee['name']) . ' - Årsöversikt ' . $year;
                     <td><?php echo number_format($yearTotals['total_100'], 1, ',', ' '); ?></td>
                     <td><?php echo number_format($yearTotals['total_avtalad'], 1, ',', ' '); ?></td>
                     <td class="grey-bg"><?php echo number_format($yearTotals['total_arbete'], 1, ',', ' '); ?></td>
-                    <td><?php echo number_format($yearTotals['total_distansarbete'], 1, ',', ' '); ?></td>
+                    
                     <td class="grey-bg"><?php echo number_format($yearTotals['total_saldo'], 1, ',', ' '); ?></td>
                     <td></td>
                 </tr>
