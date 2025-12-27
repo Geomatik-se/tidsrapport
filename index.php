@@ -80,6 +80,7 @@ $toggleViewText = $view === 'month' ? 'Visa årsöversikt' : 'Visa månadsövers
                     <li><a href="index.php">Hem</a></li>
                     <li><a href="employees.php">Medarbetare</a></li>
                     <li><a href="holidays.php">Röda dagar</a></li>
+                    <li><a href="users.php">Användare</a></li>
                     <li><a href="import.php">Importera</a></li>
                     <li><a href="logout.php">Logga ut</a></li>
                 </ul>
