@@ -116,9 +116,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="number" id="avtalad_procent" name="avtalad_procent" value="<?php echo htmlspecialchars($employee['avtalad_procent'] ?? 100.0); ?>" step="0.1" min="0" max="100">
             </div>
             
-            <div class="form-group">
+            <div class="form-group" style="margin-top: 10px;">
                 <button type="submit" class="btn btn-success">Spara</button>
-                <a href="employees.php" class="btn">Avbryt</a>
+                <a href="employees.php" class="btn" style="margin-left: 30px; background-color: #95a5a6;">Avbryt</a>
             </div>
         </form>
     </div>
