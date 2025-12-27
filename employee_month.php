@@ -57,7 +57,7 @@ foreach ($workHours as $workHour) {
 $holidays = getHolidaysForYear($year);
 $holidayDates = [];
 foreach ($holidays as $holiday) {
-    $holidayDates[$holiday['date']] = $holiday['description'];
+    $holidayDates[$holiday['date']] = $holiday['name'];
 }
 
 // Formular verarbeiten

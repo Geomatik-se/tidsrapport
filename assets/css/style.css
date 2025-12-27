@@ -284,6 +284,17 @@ button:hover,
   justify-content: space-between;
 }
 
+/* Aktionen in Tabellen */
+td.actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+td.actions .delete-form {
+  margin: 0;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .employee-cards {

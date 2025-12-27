@@ -132,7 +132,7 @@ $pageTitle = 'Röda dagar ' . $year;
                         <?php foreach ($holidays as $holiday): ?>
                             <tr>
                                 <td><?php echo formatDateSwedish($holiday['date'], 'long'); ?></td>
-                                <td><?php echo htmlspecialchars($holiday['description']); ?></td>
+                                <td><?php echo htmlspecialchars($holiday['name']); ?></td>
                                 <td>
                                     <form method="post" action="" class="delete-form" onsubmit="return confirm('Är du säker på att du vill ta bort denna röda dag?');">
                                         <input type="hidden" name="id" value="<?php echo $holiday['id']; ?>">

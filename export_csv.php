@@ -36,13 +36,13 @@ try {
     $startDate = sprintf('%04d-%02d-01', $year, $month);
     $endDate = date('Y-m-t', strtotime($startDate));
     
-    $stmt = $pdo->prepare("SELECT date, description FROM holidays WHERE date BETWEEN ? AND ?");
+    $stmt = $pdo->prepare("SELECT date, name FROM holidays WHERE date BETWEEN ? AND ?");
     $stmt->execute([$startDate, $endDate]);
-    $holidays = $stmt->fetchAll();
+    $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     $holidayDates = [];
     foreach ($holidays as $holiday) {
-        $holidayDates[$holiday['date']] = $holiday['description'];
+        $holidayDates[$holiday['date']] = $holiday['name'];
     }
 
     // Ausgabepuffer leeren
