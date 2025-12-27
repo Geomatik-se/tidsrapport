@@ -3,7 +3,10 @@
  * Authentifizierungsfunktionen
  */
 
-session_start();
+// Session nur starten, wenn noch keine aktiv ist
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once __DIR__ . '/../config/database.php';
 

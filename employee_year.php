@@ -6,6 +6,7 @@
 require_once 'includes/auth.php';
 require_once 'includes/employees.php';
 require_once 'includes/date_helper.php';
+require_once 'includes/navigation_helper.php';
 
 // Benutzer muss angemeldet sein
 requireLogin();
@@ -79,8 +80,7 @@ $pageTitle = htmlspecialchars($employee['name']) . ' - Årsöversikt ' . $year;
         <div class="page-header">
             <h1><?php echo $pageTitle; ?></h1>
             <div class="page-actions">
-                <a href="employee_year.php?id=<?php echo $id; ?>&year=<?php echo $year - 1; ?>" class="btn">&laquo; Föregående år</a>
-                <a href="employee_year.php?id=<?php echo $id; ?>&year=<?php echo $year + 1; ?>" class="btn">Nästa år &raquo;</a>
+                <?php echo renderYearNavigation($year, 'employee_year.php', ['id' => $id]); ?>
                 <a href="export_year_csv.php?id=<?php echo $id; ?>&year=<?php echo $year; ?>" class="btn btn-primary">Als Excel exportieren</a>
                 <a href="employees.php" class="btn">Tillbaka till medarbetare</a>
             </div>

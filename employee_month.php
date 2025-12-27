@@ -7,6 +7,7 @@ require_once 'includes/auth.php';
 require_once 'includes/employees.php';
 require_once 'includes/work_hours.php';
 require_once 'includes/date_helper.php';
+require_once 'includes/navigation_helper.php';
 
 // Benutzer muss angemeldet sein
 requireLogin();
@@ -171,8 +172,8 @@ $pageTitle = htmlspecialchars($employee['name']) . ' - ' . getMonthName($month) 
         <div class="page-header">
             <h1><?php echo $pageTitle; ?></h1>
             <div class="page-actions">
-                <a href="employee_month.php?id=<?php echo $id; ?>&year=<?php echo $prevYear; ?>&month=<?php echo $prevMonth; ?>" class="btn">&laquo; Föregående månad</a>
-                <a href="employee_month.php?id=<?php echo $id; ?>&year=<?php echo $nextYear; ?>&month=<?php echo $nextMonth; ?>" class="btn">Nästa månad &raquo;</a>
+                <?php echo renderYearNavigation($year, 'employee_month.php', ['id' => $id, 'month' => $month]); ?>
+                <?php echo renderMonthSelector($month, $year, 'employee_month.php?id=' . $id); ?>
                 <a href="employee_year.php?id=<?php echo $id; ?>&year=<?php echo $year; ?>" class="btn">Visa årsöversikt</a>
                 <a href="export_csv.php?id=<?php echo $id; ?>&year=<?php echo $year; ?>&month=<?php echo $month; ?>" class="btn btn-primary">Als Excel exportieren</a>
                 <a href="employees.php" class="btn">Tillbaka till medarbetare</a>

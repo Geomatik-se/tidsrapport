@@ -6,6 +6,8 @@
 require_once 'includes/auth.php';
 require_once 'includes/employees.php';
 require_once 'includes/date_helper.php';
+require_once 'includes/navigation_helper.php';
+require_once 'auto_setup.php';
 
 // Benutzer muss angemeldet sein
 requireLogin();
@@ -13,6 +15,9 @@ requireLogin();
 // Aktuelles Jahr und Monat
 $currentYear = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
 $currentMonth = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
+
+// Automatisch Setup für die nächsten Jahre durchführen
+silentAutoSetup($currentYear);
 
 // Ansicht (Monat oder Jahr)
 $view = isset($_GET['view']) ? $_GET['view'] : 'month';
@@ -89,9 +94,14 @@ $toggleViewText = $view === 'month' ? 'Visa årsöversikt' : 'Visa månadsövers
             <h1><?php echo htmlspecialchars($pageTitle); ?></h1>
             
             <div class="page-actions">
-                <a href="<?php echo $prevUrl; ?>" class="btn">&laquo; Föregående</a>
-                <a href="<?php echo $toggleViewUrl; ?>" class="btn"><?php echo $toggleViewText; ?></a>
-                <a href="<?php echo $nextUrl; ?>" class="btn">Nästa &raquo;</a>
+                <?php 
+                $navParams = ['view' => $view];
+                if ($view === 'month') {
+                    $navParams['month'] = $currentMonth;
+                }
+                echo renderYearNavigation($currentYear, 'index.php', $navParams); 
+                ?>
+                <a href="<?php echo $toggleViewUrl; ?>" class="btn btn-primary"><?php echo $toggleViewText; ?></a>
             </div>
         </div>
         

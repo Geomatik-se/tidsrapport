@@ -6,6 +6,7 @@
 require_once 'includes/auth.php';
 require_once 'includes/work_hours.php';
 require_once 'includes/date_helper.php';
+require_once 'includes/navigation_helper.php';
 
 // Benutzer muss angemeldet sein
 requireLogin();
@@ -77,8 +78,7 @@ $pageTitle = 'Röda dagar ' . $year;
         <div class="page-header">
             <h1><?php echo $pageTitle; ?></h1>
             <div class="page-actions">
-                <a href="holidays.php?year=<?php echo $year - 1; ?>" class="btn">&laquo; <?php echo $year - 1; ?></a>
-                <a href="holidays.php?year=<?php echo $year + 1; ?>" class="btn"><?php echo $year + 1; ?> &raquo;</a>
+                <?php echo renderYearNavigation($year, 'holidays.php'); ?>
             </div>
         </div>
         
@@ -89,6 +89,13 @@ $pageTitle = 'Röda dagar ' . $year;
         <?php if (!empty($error)): ?>
             <div class="error-message"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
+        
+        <div class="admin-tools">
+            <h3>Admin-verktyg</h3>
+            <div class="admin-actions">
+                <a href="generate_holidays.php" class="btn btn-secondary">Generera röda dagar för flera år</a>
+            </div>
+        </div>
         
         <div class="section">
             <h2>Lägg till röd dag</h2>

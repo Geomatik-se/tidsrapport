@@ -204,4 +204,107 @@ function initializeMonthWorkHours($employeeId, $month, $year) {
     }
     
     return $success;
+}
+
+/**
+ * Initialisiert Arbeitszeiten für alle Mitarbeiter für ein ganzes Jahr
+ * 
+ * @param int $year Jahr
+ * @return array Bericht über die Initialisierung
+ */
+function initializeYearForAllEmployees($year) {
+    $pdo = getDBConnection();
+    
+    // Alle Mitarbeiter abrufen
+    $stmt = $pdo->query("SELECT id, name FROM employees ORDER BY name");
+    $employees = $stmt->fetchAll();
+    
+    $report = [
+        'year' => $year,
+        'employees_processed' => 0,
+        'months_initialized' => 0,
+        'errors' => []
+    ];
+    
+    foreach ($employees as $employee) {
+        try {
+            for ($month = 1; $month <= 12; $month++) {
+                if (initializeMonthWorkHours($employee['id'], $month, $year)) {
+                    $report['months_initialized']++;
+                }
+            }
+            $report['employees_processed']++;
+        } catch (Exception $e) {
+            $report['errors'][] = "Fehler bei Mitarbeiter {$employee['name']}: " . $e->getMessage();
+        }
+    }
+    
+    return $report;
+}
+
+/**
+ * Prüft, ob für einen Mitarbeiter in einem Jahr bereits Daten existieren
+ * 
+ * @param int $employeeId ID des Mitarbeiters
+ * @param int $year Jahr
+ * @return bool True, wenn bereits Daten existieren
+ */
+function hasWorkDataForYear($employeeId, $year) {
+    $pdo = getDBConnection();
+    
+    $startDate = sprintf('%04d-01-01', $year);
+    $endDate = sprintf('%04d-12-31', $year);
+    
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) 
+        FROM work_hours 
+        WHERE employee_id = ? AND date BETWEEN ? AND ?
+    ");
+    $stmt->execute([$employeeId, $startDate, $endDate]);
+    
+    return $stmt->fetchColumn() > 0;
+}
+
+/**
+ * Automatische Initialisierung für neue Jahre (nur fehlende Daten)
+ * 
+ * @param int $year Jahr
+ * @return array Bericht
+ */
+function autoInitializeYear($year) {
+    $pdo = getDBConnection();
+    
+    // Mitarbeiter ohne Daten für das Jahr finden
+    $stmt = $pdo->prepare("
+        SELECT e.id, e.name 
+        FROM employees e
+        WHERE NOT EXISTS (
+            SELECT 1 FROM work_hours wh 
+            WHERE wh.employee_id = e.id 
+            AND YEAR(wh.date) = ?
+        )
+        ORDER BY e.name
+    ");
+    $stmt->execute([$year]);
+    $employeesWithoutData = $stmt->fetchAll();
+    
+    $report = [
+        'year' => $year,
+        'employees_needing_init' => count($employeesWithoutData),
+        'employees_initialized' => 0,
+        'errors' => []
+    ];
+    
+    foreach ($employeesWithoutData as $employee) {
+        try {
+            for ($month = 1; $month <= 12; $month++) {
+                initializeMonthWorkHours($employee['id'], $month, $year);
+            }
+            $report['employees_initialized']++;
+        } catch (Exception $e) {
+            $report['errors'][] = "Fehler bei Mitarbeiter {$employee['name']}: " . $e->getMessage();
+        }
+    }
+    
+    return $report;
 } 

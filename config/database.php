@@ -6,9 +6,9 @@
 // Datenbank-Konfiguration
 define('DB_HOST', '62.108.32.157');
 define('DB_PORT', '3306');
-define('DB_NAME', 'aealubjt_arbetstid');
-define('DB_USER', 'aealubjt_3');
-define('DB_PASS', 'xalslv004');
+define('DB_NAME', 'aealubjt_2026');
+define('DB_USER', 'aealubjt_2026');
+define('DB_PASS', 'Morot1234');
 
 /**
  * Stellt eine Verbindung zur Datenbank her
