@@ -46,10 +46,18 @@ function getHolidaysForYear($year) {
  * @return bool True bei Erfolg, sonst False
  */
 function addHoliday($date, $description) {
-    $pdo = getDBConnection();
-    
-    $stmt = $pdo->prepare("INSERT INTO holidays (date, description) VALUES (?, ?)");
-    return $stmt->execute([$date, $description]);
+    try {
+        $pdo = getDBConnection();
+        
+        // Jahr aus Datum extrahieren
+        $year = (int)date('Y', strtotime($date));
+        
+        $stmt = $pdo->prepare("INSERT INTO holidays (date, name, year) VALUES (?, ?, ?)");
+        return $stmt->execute([$date, $description, $year]);
+    } catch (PDOException $e) {
+        error_log("addHoliday Fehler: " . $e->getMessage());
+        throw $e;
+    }
 }
 
 /**
