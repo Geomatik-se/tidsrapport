@@ -1,42 +1,25 @@
 <?php
-/**
- * Benutzerverwaltung
- */
-
 require_once 'includes/auth.php';
 require_once 'config/database.php';
 
-// Benutzer muss angemeldet sein
 requireLogin();
 
 // Benutzer löschen
-if (isset($_POST['delete']) && isset($_POST['id'])) {
+if (isset($_POST['delete']) && isset($_POST['id']) && isAdmin()) {
     $id = (int)$_POST['id'];
     
-    // Verhindere das Löschen des eigenen Accounts
     if ($id !== $_SESSION['user_id']) {
-        try {
-            $pdo = getDBConnection();
-            $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
-            $stmt->execute([$id]);
-            $successMessage = 'Användaren har tagits bort.';
-        } catch (PDOException $e) {
-            $errorMessage = 'Det gick inte att ta bort användaren.';
-        }
-    } else {
-        $errorMessage = 'Du kan inte ta bort ditt eget konto.';
+        $pdo = getDBConnection();
+        $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+        $stmt->execute([$id]);
+        header('Location: users.php');
+        exit;
     }
 }
 
-// Alle Benutzer abrufen
-try {
-    $pdo = getDBConnection();
-    $stmt = $pdo->query("SELECT id, username, created_at FROM users ORDER BY username");
-    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $users = [];
-    $errorMessage = 'Kunde inte hämta användare.';
-}
+$pdo = getDBConnection();
+$stmt = $pdo->query("SELECT id, username, created_at FROM users ORDER BY username");
+$users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="sv">
@@ -73,14 +56,6 @@ try {
             </div>
         </div>
         
-        <?php if (isset($successMessage)): ?>
-            <div class="success-message"><?php echo htmlspecialchars($successMessage); ?></div>
-        <?php endif; ?>
-        
-        <?php if (isset($errorMessage)): ?>
-            <div class="error-message"><?php echo htmlspecialchars($errorMessage); ?></div>
-        <?php endif; ?>
-        
         <table>
             <thead>
                 <tr>
@@ -90,28 +65,33 @@ try {
                 </tr>
             </thead>
             <tbody>
-                <?php if (count($users) > 0): ?>
-                    <?php foreach ($users as $user): ?>
-                        <tr>
-                            <td><?php echo htmlspecialchars($user['username']); ?></td>
-                            <td><?php echo htmlspecialchars($user['created_at'] ?? 'N/A'); ?></td>
-                            <td class="actions">
-                                <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                                    <form method="post" action="" class="delete-form" onsubmit="return confirm('Är du säker på att du vill ta bort denna användare?');">
-                                        <input type="hidden" name="id" value="<?php echo $user['id']; ?>">
-                                        <button type="submit" name="delete" class="btn btn-danger">Ta bort</button>
-                                    </form>
-                                <?php else: ?>
-                                    <span style="color: #95a5a6;">Nuvarande användare</span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
+                <?php foreach ($users as $user): ?>
                     <tr>
-                        <td colspan="3">Inga användare hittades.</td>
+                        <td><?php echo htmlspecialchars($user['username'], ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo $user['created_at']; ?></td>
+                        <td class="actions">
+                            <?php 
+                            $isCurrentUser = ($user['id'] == $_SESSION['user_id']);
+                            $userIsAdmin = isAdmin();
+                            ?>
+                            
+                            <a href="user_edit.php?id=<?php echo $user['id']; ?>" class="btn btn-primary" style="margin-right: 10px;">Redigera</a>
+                            
+                            <?php 
+                            if ($isCurrentUser) {
+                                echo '<span style="color: #95a5a6;">Nuvarande användare</span>';
+                            } elseif ($userIsAdmin) {
+                                echo '<form method="post" action="" class="delete-form" style="display:inline;" onsubmit="return confirm(\'Är du säker?\');">';
+                                echo '<input type="hidden" name="id" value="' . $user['id'] . '">';
+                                echo '<button type="submit" name="delete" class="btn btn-danger">Ta bort</button>';
+                                echo '</form>';
+                            } else {
+                                echo '<span style="color: #95a5a6;">-</span>';
+                            }
+                            ?>
+                        </td>
                     </tr>
-                <?php endif; ?>
+                <?php endforeach; ?>
             </tbody>
         </table>
     </div>
