@@ -1,0 +1,482 @@
+<?php
+/**
+ * Import von Arbeitszeiten aus Excel/CSV-Dateien
+ */
+
+require_once 'includes/auth.php';
+require_once 'includes/employees.php';
+require_once 'includes/work_hours.php';
+
+// Benutzer muss angemeldet sein
+requireLogin();
+
+$message = '';
+$error = '';
+$importResults = [];
+
+// Parameter für Monat/Jahr beim Import
+$importYear = isset($_POST['import_year']) ? (int)$_POST['import_year'] : (int)date('Y');
+$importMonth = isset($_POST['import_month']) ? (int)$_POST['import_month'] : (int)date('m');
+$employeeId = isset($_POST['employee_id']) ? (int)$_POST['employee_id'] : 0;
+
+// Verarbeite Upload
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['import_file'])) {
+    $file = $_FILES['import_file'];
+    
+    // Prüfe auf Upload-Fehler
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        $error = 'Fehler beim Hochladen der Datei.';
+    } else {
+        $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        
+        // Prüfe Dateityp
+        if (!in_array($fileExtension, ['csv', 'xlsx', 'xls'])) {
+            $error = 'Nur CSV- und Excel-Dateien (.csv, .xlsx, .xls) sind erlaubt.';
+        } else {
+            try {
+                if ($fileExtension === 'csv') {
+                    // CSV-Import
+                    $importResults = importFromCSV($file['tmp_name'], $importYear, $importMonth, $employeeId);
+                } else {
+                    // Excel-Import (benötigt PhpSpreadsheet)
+                    if (file_exists('vendor/autoload.php')) {
+                        require_once 'vendor/autoload.php';
+                        $importResults = importFromExcel($file['tmp_name']);
+                    } else {
+                        // Fallback: Konvertiere Excel zu CSV
+                        $error = 'Excel-Import benötigt PhpSpreadsheet. Bitte verwenden Sie CSV-Dateien oder installieren Sie Composer-Abhängigkeiten.';
+                    }
+                }
+                
+                if (!empty($importResults['success'])) {
+                    $message = sprintf(
+                        'Import erfolgreich! %d Zeilen importiert, %d übersprungen, %d Fehler.',
+                        $importResults['imported'],
+                        $importResults['skipped'],
+                        $importResults['errors']
+                    );
+                }
+            } catch (Exception $e) {
+                $error = 'Fehler beim Import: ' . $e->getMessage();
+            }
+        }
+    }
+}
+
+/**
+ * Importiert Arbeitszeiten aus einer CSV-Datei
+ * 
+ * Erwartetes Format:
+ * - Mit vollständigem Datum: Mitarbeiter-ID/Name, Datum (YYYY-MM-DD), Arbeitszeit, Krank, Urlaub, Vereinbart%, Arbeit, Distanzarbeit
+ * - Nur Tag: Datum (z.B. "1 Mån"), Arbeitszeit, Krank, Urlaub, 100%, Avtalad%, Avtalad tid, Arbete, Distansarbete
+ */
+function importFromCSV($filePath, $defaultYear = null, $defaultMonth = null, $defaultEmployeeId = null) {
+    if ($defaultYear === null) $defaultYear = (int)date('Y');
+    if ($defaultMonth === null) $defaultMonth = (int)date('m');
+    $results = [
+        'success' => true,
+        'imported' => 0,
+        'skipped' => 0,
+        'errors' => 0,
+        'details' => []
+    ];
+    
+    if (($handle = fopen($filePath, 'r')) !== false) {
+        $header = fgetcsv($handle, 1000, ','); // Erste Zeile als Header
+        $lineNumber = 1;
+        
+        while (($data = fgetcsv($handle, 1000, ',')) !== false) {
+            $lineNumber++;
+            
+            try {
+                // Überspringe leere Zeilen
+                if (empty(array_filter($data))) {
+                    continue;
+                }
+                
+                // Erkenne Format: Entweder mit Mitarbeiter-Spalte oder nur Daten
+                $hasEmployeeColumn = !is_numeric($data[0]) && !preg_match('/^\d+\s+\w+/', $data[0]);
+                
+                if ($hasEmployeeColumn) {
+                    // Format: Mitarbeiter, Datum, Arbeitszeit, ...
+                    if (count($data) < 3) {
+                        $results['skipped']++;
+                        $results['details'][] = "Zeile $lineNumber: Nicht genug Spalten";
+                        continue;
+                    }
+                    
+                    $employeeIdentifier = trim($data[0]);
+                    $dateStr = trim($data[1]);
+                    $colOffset = 2;
+                } else {
+                    // Format: Datum, Arbeitszeit, ... (ohne Mitarbeiter-Spalte)
+                    if ($defaultEmployeeId === null || $defaultEmployeeId === 0) {
+                        $results['errors']++;
+                        $results['details'][] = "Zeile $lineNumber: Kein Mitarbeiter ausgewählt für Format ohne Mitarbeiter-Spalte";
+                        continue;
+                    }
+                    $employeeIdentifier = $defaultEmployeeId;
+                    $dateStr = trim($data[0]);
+                    $colOffset = 1;
+                }
+                
+                // Parse Datum
+                $date = null;
+                
+                // Format 1: Vollständiges Datum YYYY-MM-DD
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
+                    $date = $dateStr;
+                    $year = (int)date('Y', strtotime($date));
+                    $month = (int)date('m', strtotime($date));
+                }checkdate($month, (int)date('d', strtotime($date)), $year)) {
+                    $results['errors']++;
+                    $results['details'][] = "Zeile $lineNumber: Ungültiges Datum '$date'
+                    $day = (int)$matches[1];
+                    $date = sprintf('%04d-%02d-%02d', $defaultYear, $defaultMonth, $day);
+                    $year = $defaultYear;
+                    $month = $defaultMonth;
+                } else {mber: Ungültiges Datumsformat '$dateStr'";
+                    continue;
+                }
+                
+                // Extrahiere Werte (ab colOffset)
+                $arbetstid = isset($data[$colOffset]) ? floatval(str_replace(',', '.', $data[$colOffset])) : 0;
+                $sjuk = isset($data[$colOffset + 1]) ? floatval(str_replace(',', '.', $data[$colOffset + 1])) : 0;
+                $semester = isset($data[$colOffset + 2]) ? floatval(str_replace(',', '.', $data[$colOffset + 2])) : 0;
+                
+                // Überspringe "100%" Spalte wenn vorhanden
+                $nextCol = $colOffset + 3;
+                if (isset($data[$nextCol]) && strpos($data[$nextCol], '%') !== false) {
+                    $nextCol++;
+                }
+                
+                $avtaladProcent = isset($data[$nextCol]) ? floatval(str_replace(',', '.', $data[$nextCol])) : 100;
+                $nextCol++;
+                
+                // Überspringe "Avtalad tid" Spalte wenn vorhanden
+                if (isset($data[$nextCol]) && is_numeric(str_replace(',', '.', $data[$nextCol]))) {
+                    $nextCol++;
+                }
+                
+                $arbete = isset($data[$nextCol]) ? floatval(str_replace(',', '.', $data[$nextCol])) : 0;
+                $distansarbete = isset($data[$nextCol + 1]) ? floatval(str_replace(',', '.', $data[$nextCol + 1 0;
+                $avtaladProcent = isset($data[5]) ? floatval(str_replace(',', '.', $data[5])) : 100;
+                $arbete = isset($data[6]) ? floatval(str_replace(',', '.', $data[6])) : 0;
+                $distansarbete = isset($data[7]) ? floatval(str_replace(',', '.', $data[7])) : 0;
+                
+                // Finde Mitarbeiter
+                $employee = null;
+                if (is_numeric($employeeIdentifier)) {
+                    $employee = getEmployeeById((int)$employeeIdentifier);
+                } else {
+                    // Suche nach Name
+                    $pdo = getDBConnection();
+                    $stmt = $pdo->prepare("SELECT * FROM employees WHERE name LIKE ?");
+                    $stmt->execute(['%' . $employeeIdentifier . '%']);
+                    $employee = $stmt->fetch();
+                }
+                
+                if (!$employee) {
+                    $results['errors']++;
+                    $results['details'][] = "Zeile $lineNumber: Mitarbeiter '$employeeIdentifier' nicht gefunden";
+                    continue;
+                }
+                
+                // Validiere Datum
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+                    $results['errors']++;
+                    $results['details'][] = "Zeile $lineNumber: Ungültiges Datumsformat '$date' (erwartet YYYY-MM-DD)";
+                    continue;
+                }
+                
+                // Speichere Arbeitszeiten
+                $pdo = getDBConnection();
+                $year = (int)date('Y', strtotime($date));
+                $month = (int)date('m', strtotime($date));
+                
+                // Prüfe ob Eintrag existiert
+                $stmt = $pdo->prepare("SELECT id FROM work_hours WHERE employee_id = ? AND date = ?");
+                $stmt->execute([$employee['id'], $date]);
+                $existing = $stmt->fetch();
+                
+                if ($existing) {
+                    // Update
+                    $stmt = $pdo->prepare("
+                        UPDATE work_hours 
+                        SET arbetstid = ?, sjuk = ?, semester = ?, avtalad_procent = ?, 
+                            arbete = ?, distansarbete = ?, year = ?, month = ?
+                        WHERE id = ?
+                    ");
+                    $stmt->execute([
+                        $arbetstid, $sjuk, $semester, $avtaladProcent, 
+                        $arbete, $distansarbete, $year, $month, $existing['id']
+                    ]);
+                } else {
+                    // Insert
+                    $stmt = $pdo->prepare("
+                        INSERT INTO work_hours 
+                        (employee_id, date, arbetstid, sjuk, semester, avtalad_procent, arbete, distansarbete, year, month)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $stmt->execute([
+                        $employee['id'], $date, $arbetstid, $sjuk, $semester, 
+                        $avtaladProcent, $arbete, $distansarbete, $year, $month
+                    ]);
+                }
+                
+                $results['imported']++;
+                
+            } catch (Exception $e) {
+                $results['errors']++;
+                $results['details'][] = "Zeile $lineNumber: " . $e->getMessage();
+            }
+        }
+        
+        fclose($handle);
+    } else {
+        throw new Exception('Konnte Datei nicht öffnen');
+    }
+    
+    return $results;
+}
+
+/**
+ * Importiert Arbeitszeiten aus einer Excel-Datei
+ */
+function importFromExcel($filePath) {
+    // Wenn PhpSpreadsheet verfügbar ist
+    if (class_exists('\PhpOffice\PhpSpreadsheet\IOFactory')) {
+        $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filePath);
+        $worksheet = $spreadsheet->getActiveSheet();
+        
+        // Konvertiere zu Array und verarbeite wie CSV
+        $csvData = [];
+        foreach ($worksheet->getRowIterator() as $row) {
+            $rowData = [];
+            $cellIterator = $row->getCellIterator();
+            $cellIterator->setIterateOnlyExistingCells(false);
+            
+            foreach ($cellIterator as $cell) {
+                $rowData[] = $cell->getValue();
+            }
+            $csvData[] = $rowData;
+        }
+        
+        // Speichere als temporäre CSV
+        $tmpCsv = tempnam(sys_get_temp_dir(), 'import_') . '.csv';
+        $fp = fopen($tmpCsv, 'w');
+        foreach ($csvData as $row) {
+            fputcsv($fp, $row);
+        }
+        fclose($fp);
+        
+        $results = importFromCSV($tmpCsv);
+        unlink($tmpCsv);
+        
+        return $results;
+    }
+    
+    throw new Exception('PhpSpreadsheet nicht verfügbar');
+}
+
+?>
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import - Tidsrapportering</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        .import-container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .upload-area:hover {
+            border-color: #3498db;
+            background: #f8f9fa;
+        }
+        .format-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .format-info h3 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+        .format-info code {
+            background: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .results {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .results.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .results.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .details {
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .btn {
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover {
+            background: #2980b9;
+        }
+        .btn-secondary {
+            background: #95a5a6;
+        }
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="import-container">
+        <h1>Arbeitszeiten importieren</h1>
+        
+        <?php if ($message): ?>
+            <div class="results success">
+                <strong>✓ Erfolg:</strong> <?php echo htmlspecialchars($message); ?>
+                <?php if (!empty($importResults['details'])): ?>
+                    <details>
+                        <summary>Details anzeigen (<?php echo count($importResults['details']); ?> Meldungen)</summary>
+                        <div class="details">
+                            <?php foreach ($importResults['details'] as $detail): ?>
+                                <div><?php echo htmlspecialchars($detail); ?></div>
+                            <?php endforeach; ?>
+                        </div>
+                    </details>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if ($error): ?>
+            <div class="results error">
+                <strong>✗ Fehler:</strong> <?php echo htmlspecialchars($error); ?>
+            </div>
+        <?php endif; ?>
+        
+        <div class="format-info">
+            <h3>📋 Dateiformat</h3>
+            <p>Die Datei sollte folgende Spalten enthalten (Header-Zeile ist optional):</p>
+            <ol>
+                <li><code>Mitarbeiter</code> - ID oder Name</li>
+                <li><code>Datum</code> - Format: YYYY-MM-DD (z.B. 2025-12-27)</li>
+                <li><code>Arbeitszeit</code> - Stunden (z.B. 8.0)</li>
+                <li><code>Krank</code> - Stunden (optional, Standard: 0)</li>
+                <li><code>Urlaub</code> - Stunden (optional, Standard: 0)</li>
+                <li><code>Vereinbart%</code> - Prozent (optional, Standard: 100)</li>
+                <li><code>Arbeit</code> - Stunden (optional, Standard: 0)</li>
+                <li><code>Distanzarbeit</code> - Stunden (optional, Standard: 0)</li>
+            </ol>
+            <p><strong>Beispiel CSV-Zeile:</strong><br>
+            <code>1,2025-12-27,8.0,0,0,100,8.0,0</code></p>
+        </div>
+        
+        <form method="post" enctype="multipart/form-data">
+            <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+                <h3 style="margin-top: 0;">Import-Einstellungen</h3>
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="employee_id"><strong>Mitarbeiter:</strong> (nur für Exporte ohne Mitarbeiter-Spalte)</label>
+                    <select name="employee_id" id="employee_id" style="width: 100%; padding: 8px; margin-top: 5px;">
+                        <option value="0">-- Wird aus Datei gelesen --</option>
+                        <?php
+                        try {
+                            $employees = getAllEmployees();
+                            foreach ($employees as $emp) {
+                                $selected = ($emp['id'] == $employeeId) ? 'selected' : '';
+                                echo "<option value='{$emp['id']}' $selected>{$emp['name']}</option>";
+                            }
+                        } catch (Exception $e) {
+                            echo "<option value='0'>Fehler beim Laden der Mitarbeiter</option>";
+                        }
+                        ?>
+                    </select>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <label for="import_year"><strong>Jahr:</strong> (für Datumsangaben ohne Jahr)</label>
+                        <input type="number" name="import_year" id="import_year" value="<?php echo $importYear; ?>" 
+                               min="2020" max="2030" style="width: 100%; padding: 8px; margin-top: 5px;">
+                    </div>
+                    
+                    <div>
+                        <label for="import_month"><strong>Monat:</strong> (für Datumsangaben ohne Monat)</label>
+                        <select name="import_month" id="import_month" style="width: 100%; padding: 8px; margin-top: 5px;">
+                            <?php
+                            $months = [
+                                1 => 'Januar', 2 => 'Februar', 3 => 'März', 4 => 'April',
+                                5 => 'Mai', 6 => 'Juni', 7 => 'Juli', 8 => 'August',
+                                9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Dezember'
+                            ];
+                            foreach ($months as $num => $name) {
+                                $selected = ($num == $importMonth) ? 'selected' : '';
+                                echo "<option value='$num' $selected>$num - $name</option>";
+                            }
+                            ?>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="upload-area">
+                <input type="file" name="import_file" accept=".csv,.xlsx,.xls" required style="margin: 20px 0;">
+                <p>Ziehen Sie eine Datei hierher oder klicken Sie zum Auswählen</p>
+                <p style="color: #666; font-size: 14px;">Unterstützte Formate: CSV, Excel (.xlsx, .xls)</p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button type="submit" class="btn">Importieren</button>
+                <a href="index.php" class="btn btn-secondary">Abbrechen</a>
+            </div>
+        </form>
+        
+        <div style="margin-top: 30px;">
+            <h3>💡 Tipps</h3>
+            <ul>
+                <li>Sie können eine exportierte CSV-Datei bearbeiten und wieder importieren</li>
+                <li>Bestehende Einträge werden aktualisiert, neue werden hinzugefügt</li>
+                <li>Verwenden Sie die Mitarbeiter-ID für genaueste Zuordnung</li>
+                <li>Dezimalzahlen können mit Punkt (.) oder Komma (,) eingegeben werden</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
